@@ -122,8 +122,11 @@ public abstract class BaseSystem
     #endregion
 
 #region virtual - store: add / remove
-    protected internal virtual  void OnRemoveStore(EntityStore store) { }
-    protected internal virtual  void OnAddStore   (EntityStore store) { }
+    internal  virtual  void AddStoreInternal   (EntityStore store) => OnAddStore(store);
+    internal  virtual  void RemoveStoreInternal(EntityStore store) => OnRemoveStore(store);
+    
+    protected virtual  void OnAddStore   (EntityStore store) { }
+    protected virtual  void OnRemoveStore(EntityStore store) { }
     #endregion
     
 #region virtual - system: update
@@ -207,7 +210,7 @@ public abstract class BaseSystem
             system.systemRoot = newRoot;
             newRoot.AddSystemToRoot(system);
             foreach (var store in newRoot.stores) {
-                system.OnAddStore(store);
+                system.AddStoreInternal(store);
             }
         }
     }
@@ -225,7 +228,7 @@ public abstract class BaseSystem
             system.systemRoot = null;
             currentRoot.RemoveSystemFromRoot(system);
             foreach (var store in currentRoot.stores) {
-                system.OnRemoveStore(store);
+                system.RemoveStoreInternal(store);
             }
         }
     }
@@ -251,29 +254,41 @@ public abstract class BaseSystem
     #endregion
     
 #region perf
+    private const int DefaultNameColLen = 30;
+    
     /// <summary>
     /// Returns performance statistics formatted as a table intended for logging.
     /// </summary>
-    public string GetPerfLog()
+    public string GetPerfLog(int nameColLen = 0)
     {
+        nameColLen = nameColLen <= 0 ? DefaultNameColLen : nameColLen;
         var sb = stringBuffer ??= new StringBuilder();
         sb.Clear();
-        AppendPerfLog (sb);
+        AppendPerfLog (sb, nameColLen);
         return sb.ToString();
     }
     
     /// <summary>
     /// Add performance statistics formatted as a table to the given <see cref="StringBuilder"/> without memory allocations.
     /// </summary>
-    public void AppendPerfLog(StringBuilder stringBuilder) {
+    public void AppendPerfLog(StringBuilder sb, int nameColLen = 0)
+    {
+        nameColLen = nameColLen <= 0 ? DefaultNameColLen : nameColLen;
         var stores  = SystemRoot?.stores.count ?? 0;
-        stringBuilder.Append($"stores: {stores,-3}                   E M      last ms       sum ms      updates     last mem      sum mem     entities\n");
-        stringBuilder.Append("---------------------         ---     --------     --------     --------     --------     --------     --------\n");
-        AppendPerfStats(stringBuilder, 0);
-        stringBuilder.Replace(',', '.'); // no more patience with NumberFormatInfo
+        var start = sb.Length;
+        sb.Append($"stores: {stores,-3} ");
+        var len = nameColLen - (sb.Length - start);
+        if (len > 0) {
+            sb.Append(' ', len);    
+        }
+        sb.Append("E M      last ms       sum ms      updates     last mem      sum mem     entities\n");
+        sb.Append('-', nameColLen - 1);
+        sb.Append(" ---     --------     --------     --------     --------     --------     --------\n");
+        AppendPerfStats(sb, 0, nameColLen);
+        sb.Replace(',', '.'); // no more patience with NumberFormatInfo
     }
 
-    internal virtual void AppendPerfStats(StringBuilder sb, int depth)
+    internal virtual void AppendPerfStats(StringBuilder sb, int depth, int nameColLen)
     {
         var start = sb.Length;
         if (depth > 0) {
@@ -294,8 +309,13 @@ public abstract class BaseSystem
         } else {
             monitored = parentGroup?.MonitorPerf ?? false;
         }
-        var len = 30 - (sb.Length - start);
-        sb.Append(' ', len);
+        var len = nameColLen - (sb.Length - start) - 1; // -1 for additional ' '
+        if (len > 0) {
+            sb.Append(' ', len);    
+        } else {
+            sb.Length += len; // truncate if too long   
+        }
+        sb.Append(' ');
         sb.Append(enabled   ? "+ " : "- ");
         sb.Append(monitored ? "m" : " ");
         sb.Append($" {(double)Perf.LastMs,12:0.000}"); // (double) prevents allocation

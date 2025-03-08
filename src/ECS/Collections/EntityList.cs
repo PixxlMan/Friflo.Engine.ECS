@@ -5,7 +5,6 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using static System.Diagnostics.DebuggerBrowsableState;
 using Browse = System.Diagnostics.DebuggerBrowsableAttribute;
 
@@ -86,7 +85,7 @@ public sealed class EntityList : IList<Entity>
         ids = newIds;
     }
     #endregion
-
+    
 #region add entities
     /// <summary> Removes all entities from the <see cref="EntityList"/>. </summary>
     public void Clear()
@@ -197,6 +196,18 @@ public sealed class EntityList : IList<Entity>
     }
     #endregion
     
+#region sort
+    /// <summary>
+    /// Sort the entities by the component field/property with the given <see cref="memberName"/>.<br/> 
+    /// </summary>
+    /// <returns>An array containing all entity id and their field/property value.</returns>
+    public ComponentField<TField>[] SortByComponentField<TComponent,TField>(string memberName, SortOrder sortOrder, ComponentField<TField>[] fields = null)
+        where TComponent    : struct, IComponent
+    {
+        return ComponentField<TField>.Sort<TComponent>(this, memberName, sortOrder, fields);
+    }
+    #endregion
+    
 #region IList<>
     /// <summary> Gets a value indicating whether the <see cref="ICollection"/> is read-only. </summary>
     public bool IsReadOnly => false;
@@ -204,19 +215,43 @@ public sealed class EntityList : IList<Entity>
     /// <summary> Return the entity at the given <paramref name="index"/>.</summary>
     public Entity this[int index]
     {
-        get => new Entity(entityStore, ids[index]);
+        get => (index >= 0 && index < count) ? new Entity(entityStore, ids[index]) : throw new IndexOutOfRangeException();
         set => ids[index] = value.Id;
     }
-    /// <summary> not implemented </summary>
-    [ExcludeFromCodeCoverage] public bool Remove  (Entity item)             => throw new NotImplementedException();
-    /// <summary> not implemented </summary>
-    [ExcludeFromCodeCoverage] public int  IndexOf (Entity item)             => throw new NotImplementedException();
-    /// <summary> not implemented </summary>
-    [ExcludeFromCodeCoverage] public void Insert  (int index, Entity item)  => throw new NotImplementedException();
-    /// <summary> not implemented </summary>
-    [ExcludeFromCodeCoverage] public void RemoveAt(int index)               => throw new NotImplementedException();
-    /// <summary> not implemented </summary>
-    [ExcludeFromCodeCoverage] public bool Contains(Entity item)             => throw new NotImplementedException();
+
+    public bool Remove  (Entity item)
+    {
+        var index = IndexOf(item);
+        if (index < 0) {
+            return false;
+        }
+        RemoveAt(index);
+        return true;
+    }
+
+    public int  IndexOf (Entity item) {
+        return Array.IndexOf(ids, item.Id, 0, count);
+    }
+    
+    public bool Contains(Entity item) {
+        return Array.IndexOf(ids, item.Id, 0, count) >= 0;
+    }
+
+    public void Insert  (int index, Entity item) {
+        if (index < 0 || index >= count) throw new IndexOutOfRangeException();
+        if (ids.Length == count) {
+            ResizeIds();
+        }
+        var len = count++ - index;
+        Array.Copy(ids, index, ids, index + 1, len);
+        ids[index] = item.Id;
+    }
+
+    public void RemoveAt(int index) {
+        if (index < 0 || index >= count) throw new IndexOutOfRangeException();
+        var len = --count - index;
+        Array.Copy(ids, index + 1, ids, index, len);
+    }
     
     /// <summary>
     /// Copies the entities of the <see cref="EntityList"/> to an <see cref="Entity"/>[], starting at the given <paramref name="index"/>

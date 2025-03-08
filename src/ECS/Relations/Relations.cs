@@ -2,11 +2,13 @@
 // See LICENSE file in the project root for full license information.
 
 
-using System.Collections;
-using System.Collections.Generic;
+using System;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Text;
+using static System.Diagnostics.DebuggerBrowsableState;
+using Browse = System.Diagnostics.DebuggerBrowsableAttribute;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable once CheckNamespace
@@ -15,7 +17,8 @@ namespace Friflo.Engine.ECS;
 /// <summary>
 /// Contains the relations of a specific entity returned by <see cref="RelationExtensions.GetRelations{TRelation}"/>.
 /// </summary>
-public readonly struct Relations<TRelation> : IEnumerable<TRelation>
+[DebuggerTypeProxy(typeof(RelationsDebugView<>))]
+public readonly struct Relations<TRelation>
     where TRelation : struct
 {
     public   override   string          ToString()  => $"Relations<{typeof(TRelation).Name}>[{Length}]";
@@ -85,20 +88,25 @@ public readonly struct Relations<TRelation> : IEnumerable<TRelation>
     /// Return the relation at the given <paramref name="index"/>.<br/>
     /// Executes in O(1).
     /// </summary>
-    public TRelation this[int index] => components[positions != null ? positions[index] : position];
-       
-    // --- IEnumerable<>
-    IEnumerator<TRelation>   IEnumerable<TRelation>.GetEnumerator() => new RelationsEnumerator<TRelation>(this);
+    public ref TRelation this[int index] {
+        get {
+            if (index >= 0 && index < Length) {
+                return ref components[positions != null ? positions[index] : position];
+            }
+            throw IndexOutOfRangeException(index);
+        }
+    }
     
-    // --- IEnumerable
-    IEnumerator                           IEnumerable.GetEnumerator() => new RelationsEnumerator<TRelation>(this);
-    
+    private IndexOutOfRangeException IndexOutOfRangeException(int index) {
+        return new IndexOutOfRangeException($"index: {index} Length: {Length}");
+    }
+
     // --- new
     public RelationsEnumerator<TRelation>            GetEnumerator() => new RelationsEnumerator<TRelation>(this);
 }
 
 
-public struct RelationsEnumerator<TRelation> : IEnumerator<TRelation>
+public struct RelationsEnumerator<TRelation>
     where TRelation : struct
 {
     private  readonly   int[]           positions;
@@ -119,7 +127,7 @@ public struct RelationsEnumerator<TRelation> : IEnumerator<TRelation>
     }
     
     // --- IEnumerator<>
-    public readonly TRelation Current   => components[positions != null ? positions[index] : position];
+    public readonly ref TRelation Current   => ref components[positions != null ? positions[index] : position];
     
     // --- IEnumerator
     public bool MoveNext() {
@@ -134,8 +142,31 @@ public struct RelationsEnumerator<TRelation> : IEnumerator<TRelation>
         index = start;
     }
     
-    object IEnumerator.Current => Current;
-
     // --- IDisposable
     public void Dispose() { }
+}
+
+internal class RelationsDebugView<TRelation> 
+    where TRelation : struct
+{
+    [Browse(RootHidden)]
+    public              TRelation[]        Relations => GetRelations();
+    
+    [Browse(Never)]
+    private readonly    Relations<TRelation> relations;
+        
+    internal RelationsDebugView(Relations<TRelation> relations)
+    {
+        this.relations = relations;
+    }
+    
+    private TRelation[] GetRelations()
+    {
+        var array = new TRelation[relations.Length];
+        int n = 0; 
+        foreach (var relation in relations) {
+            array[n++] = relation;
+        }
+        return array;
+    }
 }

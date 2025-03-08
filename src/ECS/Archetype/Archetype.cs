@@ -307,13 +307,22 @@ public sealed class Archetype
         ResizeShrink(arch);
     }
     
-    /// <remarks>Must be used only on case all <see cref="ComponentTypes"/> are <see cref="ComponentType.IsBlittable"/></remarks>
-    internal static void CloneComponents(Archetype arch, CopyContext context)
+    /// <summary>
+    /// <see cref="TreeNode"/> components (child entities) are not copied.<br/>
+    /// Otherwise, two different entities would have the same child entities.
+    /// </summary>
+    internal static void CopyComponents(Archetype sourceArch, Archetype targetArch, in CopyContext context, long updateIndexTypes)
     {
         var sourceIndex = context.source.compIndex;
         var targetIndex = context.target.compIndex;
-        foreach (var sourceHeap in arch.structHeaps) {
-            sourceHeap.CloneComponent(sourceIndex, targetIndex, context);
+        if (sourceArch == targetArch) {
+            foreach (var sourceHeap in sourceArch.structHeaps) {
+                sourceHeap.CopyComponent(sourceIndex, sourceHeap, targetIndex, context, updateIndexTypes);
+            }
+        } else {
+            foreach (var sourceHeap in sourceArch.structHeaps) {
+                sourceHeap.CopyComponent(sourceIndex, targetArch.heapMap[sourceHeap.structIndex], targetIndex, context, updateIndexTypes);
+            }
         }
     }
     

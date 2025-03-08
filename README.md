@@ -6,6 +6,7 @@
 
 <div align="center">
 
+[![New](https://img.shields.io/badge/New-f60)](https://www.nuget.org/packages/Friflo.Engine.ECS)
 [![nuget](https://img.shields.io/nuget/v/Friflo.Engine.ECS?logo=nuget&logoColor=white)](https://www.nuget.org/packages/Friflo.Engine.ECS)
 [![codecov](https://img.shields.io/codecov/c/gh/friflo/Friflo.Engine.ECS?logo=codecov&logoColor=white&label=codecov)](https://app.codecov.io/gh/friflo/Friflo.Engine.ECS/tree/main/src/ECS)
 [![CI-Engine](https://img.shields.io/github/actions/workflow/status/friflo/Friflo.Engine.ECS/.github%2Fworkflows%2Fengine.yml?logo=github-actions&logoColor=white&label=CI)](https://github.com/friflo/Friflo.Engine.ECS/actions/workflows/engine.yml)
@@ -107,7 +108,7 @@ dotnet add package Friflo.Engine.ECS
 
 ### [Horse Runner DX](https://store.steampowered.com/app/2955320/Horse_Runner_DX)
 
-<a href="https://store.steampowered.com/app/2955320/Horse_Runner_DX"><img src="https://raw.githubusercontent.com/friflo/Friflo.Engine-docs/main/docs/images/horse-runner-dx.png" width="246" height="124"/></a>  
+<a href="https://store.steampowered.com/app/2955320/Horse_Runner_DX"><img src="https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/2955320/library_header.jpg" width="230" height="108"/></a>  
 Quote from developer: *"Just wanted to let you know that Friflo ECS 2.0.0 works like a charm in my little game.  
 I use it for basically everything (landscape segments, vegetation, players, animations,  collisions and even the floating dust particles are entities).  
 After some optimization there is no object allocation during gameplay - the allocation graph just stays flat - no garbage collection."*

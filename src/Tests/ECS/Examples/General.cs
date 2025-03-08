@@ -1,9 +1,7 @@
 ﻿using System;
-using System.IO;
 using Friflo.Engine.ECS;
-using Friflo.Engine.ECS.Serialize;
 using NUnit.Framework;
-
+using static Friflo.Engine.ECS.ComponentChangedAction;
 
 // ReSharper disable UnusedVariable
 // ReSharper disable MemberCanBePrivate.Global
@@ -177,7 +175,7 @@ public static void AddChildEntities()
 }
 
 [Test]
-public static void AddEventHandlers()
+public static void EventHandlers()
 {
     var store   = new EntityStore();
     var entity  = store.CreateEntity();
@@ -192,36 +190,121 @@ public static void AddEventHandlers()
     entity.AddChild(store.CreateEntity());
 }
 
-public readonly struct MySignal { }
+[Test]
+public static void ComponentEvents()
+{
+    var store  = new EntityStore();
+    var entity = store.CreateEntity();
+    entity.OnComponentChanged += ev =>
+    {
+        if (ev.Type == typeof(EntityName)) {
+            string log = ev.Action switch
+            {
+                Add    => $"new: {ev.Component<EntityName>()}",
+                Update => $"new: {ev.Component<EntityName>()}  old: {ev.OldComponent<EntityName>()}",
+                Remove => $"old: {ev.OldComponent<EntityName>()}",
+                _      => null
+            };
+            Console.WriteLine($"entity: {ev.Entity.Id} - {ev.Action} {log}");
+        }
+    };
+    entity.AddComponent(new EntityName("Peter"));
+    entity.AddComponent(new EntityName("Paul"));
+    entity.RemoveComponent<EntityName>();
+}
+
+/* Output
+entity: 1 - Add new: 'Peter'
+entity: 1 - Update new: 'Paul'  old: 'Peter'
+entity: 1 - Remove old: 'Paul'
+*/
+
+
+[Test]
+public static void TagEvents()
+{
+    var store  = new EntityStore();
+    var entity = store.CreateEntity();
+    entity.OnTagsChanged += ev =>
+    {
+        string log = "";
+        if (ev.AddedTags.  Has<MyTag1>()) { log += " added:   MyTag1"; }
+        if (ev.RemovedTags.Has<MyTag1>()) { log += " removed: MyTag1"; }
+        
+        if (ev.AddedTags.  Has<MyTag2>()) { log += " added:   MyTag2"; }
+        if (ev.RemovedTags.Has<MyTag2>()) { log += " removed: MyTag2"; }
+        
+        Console.WriteLine($"entity: {entity.Id} -{log}");
+    };
+    entity.AddTag<MyTag1>();
+    entity.RemoveTag<MyTag1>();
+    entity.AddTags(Tags.Get<MyTag1, MyTag2>());
+}
+
+/* Output
+entity: 1 - added:   MyTag1
+entity: 1 - removed: MyTag1
+entity: 1 - added:   MyTag1 added:   MyTag2
+*/
+
+[Test]
+public static void CloneEntity()
+{
+    var store   = new EntityStore();
+    var entity  = store.CreateEntity(new Position(1,2,3), Tags.Get<MyTag1>());
+    
+    var clone = entity.CloneEntity();
+    // the cloned entity have the same components and tags as the original entity.
+}
+
+public struct NetTag : ITag { }
+
+/// Copy subset of entities to another store
+[Test]
+public static void CopyEntities()
+{
+    var store       = new EntityStore();
+    var targetStore = new EntityStore();
+        
+    store.CreateEntity(new Position(1,1,1));                     // 1
+    store.CreateEntity(new Position(2,2,2), Tags.Get<NetTag>()); // 2
+    store.CreateEntity(new Position(3,3,3));                     // 3
+    store.CreateEntity(new Position(4,4,4), Tags.Get<NetTag>()); // 4
+    store.CreateEntity(new Position(5,5,5));                     // 5
+        
+    // Query will copy only entities [2, 4] having a NetTag
+    var query = store.Query().AnyTags(Tags.Get<NetTag>());
+    foreach (var entity in query.Entities) {
+        // preserve same entity ids in target store
+        if (!targetStore.TryGetEntityById(entity.Id, out Entity targetEntity)) {
+            targetEntity = targetStore.CreateEntity(entity.Id);
+        }
+        entity.CopyEntity(targetEntity);
+    }
+    // target store contains two entities [2, 4] with same components and tags as in the original store
+} 
+
+    
+public struct CollisionSignal {
+    public Entity other;
+}
 
 [Test]
 public static void AddSignalHandler()
 {
-    var store   = new EntityStore();
-    var entity  = store.CreateEntity();
-    entity.AddSignalHandler<MySignal>(signal => { Console.WriteLine(signal); }); // > entity: 1 - signal > MySignal
-    entity.EmitSignal(new MySignal());
+    var store  = new EntityStore();
+    var player = store.CreateEntity(1);
+    player.AddSignalHandler<CollisionSignal>(signal => {
+        Console.WriteLine($"collision signal - entity: {signal.Entity.Id} other: {signal.Event.other.Id}");
+    });
+    var npc = store.CreateEntity(2);
+    // ... detect collision. e.g. with a collision system. In case of collision:
+    player.EmitSignal(new CollisionSignal{ other = npc });
 }
 
-[Test]
-public static void JsonSerialization()
-{
-    var store = new EntityStore();
-    store.CreateEntity(new EntityName("hello JSON"));
-    store.CreateEntity(new Position(1, 2, 3));
-
-    // --- Write store entities as JSON array
-    var serializer = new EntitySerializer();
-    var writeStream = new FileStream("entity-store.json", FileMode.Create);
-    serializer.WriteStore(store, writeStream);
-    writeStream.Close();
-
-    // --- Read JSON array into new store
-    var targetStore = new EntityStore();
-    serializer.ReadIntoStore(targetStore, new FileStream("entity-store.json", FileMode.Open));
-
-    Console.WriteLine($"entities: {targetStore.Count}"); // > entities: 2
-}
+/* Output
+collision signal - entity: 1 other: 2
+*/
 
 }
 

@@ -230,15 +230,17 @@ public class SystemGroup : BaseSystem, IEnumerable
     #endregion
     
 #region store: add / remove
-    protected internal override void OnAddStore(EntityStore entityStore)
+    internal override void AddStoreInternal(EntityStore entityStore)
     {
         var commandBuffer = entityStore.GetCommandBuffer();
         commandBuffer.ReuseBuffer = true;
         commandBuffers.Add(commandBuffer);
+        OnAddStore(entityStore);
     }
     
-    protected internal override void OnRemoveStore(EntityStore entityStore)
+    internal override void RemoveStoreInternal(EntityStore entityStore)
     {
+        OnRemoveStore(entityStore);
         foreach (var commandBuffer in commandBuffers) {
             if (commandBuffer.EntityStore != entityStore) {
                 continue;
@@ -344,11 +346,11 @@ public class SystemGroup : BaseSystem, IEnumerable
         }
     }
     
-    internal override void AppendPerfStats(StringBuilder sb, int depth)
+    internal override void AppendPerfStats(StringBuilder sb, int depth, int nameColLen)
     {
-        base.AppendPerfStats(sb, depth);
+        base.AppendPerfStats(sb, depth, nameColLen);
         foreach (var child in childSystems) {
-            child.AppendPerfStats(sb, depth + 1);
+            child.AppendPerfStats(sb, depth + 1, nameColLen);
         }
     }
     #endregion

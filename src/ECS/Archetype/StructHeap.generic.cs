@@ -73,26 +73,33 @@ internal sealed class StructHeap<T> : StructHeap, IComponentStash<T>
         targetHeap.components[targetPos] = components[sourcePos];
     }
     
-    /// <remarks>
-    /// Copying a component using an assignment can only be done for <see cref="ComponentType.IsBlittable"/>
-    /// <see cref="ComponentType"/>'s.<br/>
-    /// If not <see cref="ComponentType.IsBlittable"/> serialization must be used.
-    /// </remarks>
-    internal override void CloneComponent(int sourcePos, int targetPos, in CopyContext context)
+    internal override void CopyComponent(int sourcePos, StructHeap targetHeap, int targetPos, in CopyContext context, long updateIndexTypes)
     {
-        var copyValue = CopyValueUtils<T>.CopyValue;
-        ref var source = ref components[sourcePos];
-        ref var target = ref components[targetPos];
+        if (typeof(T) == typeof(TreeNode)) {
+            return;
+        }
+        var copyValue       = CopyValueUtils<T>.CopyValue;
+        ref T source        = ref components[sourcePos];
+        var typedTargetHeap = (StructHeap<T>)targetHeap;
+        ref T target        = ref typedTargetHeap.components[targetPos];
+        if (StructInfo<T>.HasIndex) {
+            AddOrUpdateIndex(source, target, context.target, typedTargetHeap, updateIndexTypes);
+        }
         if (copyValue == null) {
             target = source;
         } else {
             copyValue(source, ref target, context);
         }
-        if (!StructInfo<T>.HasIndex) {
-            return;
+    }
+    
+    private static void AddOrUpdateIndex(in T source, in T target, in Entity targetEntity, StructHeap<T> targetHeap, long updateIndexTypes)
+    {
+        if (((1 << StructInfo<T>.Index) & updateIndexTypes) == 0) {
+            StoreIndex.AddIndex(targetEntity.store, targetEntity.Id, source);
+        } else {
+            targetHeap.componentStash = target;
+            StoreIndex.UpdateIndex(targetEntity.store, targetEntity.Id, source, targetHeap);
         }
-        var targetEntity = context.target;
-        StoreIndex.AddIndex(targetEntity.store, targetEntity.Id, source);
     }
     
     internal  override  void SetComponentDefault (int compIndex) {
